@@ -3,7 +3,7 @@ name: Build UGREEN AIC8800 Tahoe
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, version1, version2]
 
 permissions:
   contents: read

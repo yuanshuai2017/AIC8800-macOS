@@ -1038,14 +1038,20 @@ void ItlAic::handleData(const uint8_t *p, uint32_t len)
 {
     struct ieee80211com *ic = &com.sc_ic;
     uint32_t flen = rd16(p);
-    if (fDbgRx < 40 && len >= kRxHdrLen + 24 && (p[kRxHdrLen] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) {
+    uint32_t rxFlags = rd32(p + 48);
+    bool isBeacon = (len >= kRxHdrLen + sizeof(struct ieee80211_frame) + 12) &&
+        ((p[kRxHdrLen] & (IEEE80211_FC0_TYPE_MASK | IEEE80211_FC0_SUBTYPE_MASK)) ==
+         (IEEE80211_FC0_TYPE_MGT | IEEE80211_FC0_SUBTYPE_BEACON));
+    if (fDbgRx < 40 && len >= kRxHdrLen + 24 &&
+        ((p[kRxHdrLen] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA || isBeacon)) {
         fDbgRx++;
         const uint8_t *f = p + kRxHdrLen;
         AICLOG("rx fc %02x%02x len %u flags %08x st %08x a1 %s iv %02x%02x%02x%02x", f[0], f[1], flen,
-               rd32(p + 48), rd32(p + 36), ether_sprintf(f + 4), f[24], f[25], f[26], f[27]);
+               rxFlags, rd32(p + 36), ether_sprintf(f + 4), f[24], f[25], f[26], f[27]);
     }
-    if (len < kRxHdrLen + flen || flen < sizeof(struct ieee80211_frame) || !(rd32(p + 48) & (1u << 6)))
-        return;                             // not flagged for upload
+    if (len < kRxHdrLen + flen || flen < sizeof(struct ieee80211_frame) ||
+        (!(rxFlags & (1u << 6)) && !isBeacon))
+        return;                             // not flagged for upload (except beacons)
     const uint8_t *fr = p + kRxHdrLen;
     mbuf_t m = makeMbuf(fr, flen);
     if (!m)
